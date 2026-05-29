@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import JobCard from './JobCard';
 import FilterSidebar from './FilterSidebar';
 
-const API_URL = 'http://localhost:8000/api';
-const WS_URL = 'ws://localhost:8000/ws';
+const API_URL = 'https://job-latest-lhet.onrender.com/api';
+const WS_URL = 'wss://job-latest-lhet.onrender.com/ws';
 
 const JobDashboard = () => {
   const [jobs, setJobs] = useState([]);
