@@ -1,8 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
 apscheduler
 beautifulsoup4
 playwright
 pydantic
 requests
+websockets
