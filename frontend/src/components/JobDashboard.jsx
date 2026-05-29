@@ -2,15 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import JobCard from './JobCard';
 import FilterSidebar from './FilterSidebar';
 
-const API_URL = 'https://job-latest-lhet.onrender.com/api';
-const WS_URL = 'wss://job-latest-lhet.onrender.com/ws';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
 
 const JobDashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [filters, setFilters] = useState({ source: 'All', search: '' });
+  const [filters, setFilters] = useState({ source: 'All', search: '', status: 'All' });
   const [isConnected, setIsConnected] = useState(false);
   const [stats, setStats] = useState({ total: 0, sources: {} });
   const [page, setPage] = useState(1);
@@ -26,6 +26,7 @@ const JobDashboard = () => {
       
       const params = new URLSearchParams({ page: pageNum, limit: 30 });
       if (filters.source !== 'All') params.set('source', filters.source);
+      if (filters.status !== 'All') params.set('status', filters.status);
       if (filters.search) params.set('search', filters.search);
       
       const res = await fetch(`${API_URL}/jobs?${params}`);
@@ -60,7 +61,7 @@ const JobDashboard = () => {
   useEffect(() => {
     setPage(1);
     fetchJobs(1, false);
-  }, [filters.source, filters.search]);
+  }, [filters.source, filters.search, filters.status]);
 
   useEffect(() => {
     fetchStats();
@@ -85,6 +86,12 @@ const JobDashboard = () => {
             [newJob.source]: (prev.sources[newJob.source] || 0) + 1
           }
         }));
+
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("New Job Found", {
+            body: `${newJob.title} at ${newJob.company}`,
+          });
+        }
       };
       
       ws.current.onclose = () => {
@@ -95,6 +102,10 @@ const JobDashboard = () => {
     };
 
     connectWs();
+    
+    if ("Notification" in window) {
+      Notification.requestPermission();
+    }
 
     return () => {
       if (ws.current) ws.current.close();
@@ -122,6 +133,21 @@ const JobDashboard = () => {
       const nextPage = page + 1;
       setPage(nextPage);
       fetchJobs(nextPage, true);
+    }
+  };
+
+  const handleStatusChange = async (jobId, newStatus) => {
+    try {
+      const res = await fetch(`${API_URL}/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        setJobs(jobs.map(j => j.id === jobId ? { ...j, status: newStatus } : j));
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
     }
   };
 
@@ -198,9 +224,9 @@ const JobDashboard = () => {
             <div className="jobs-grid">
               {jobs.map((job, index) => {
                 if (index === jobs.length - 1) {
-                  return <JobCard ref={lastJobRef} key={`${job.id}-${index}`} job={job} />;
+                  return <JobCard ref={lastJobRef} key={`${job.id}-${index}`} job={job} onStatusChange={handleStatusChange} />;
                 }
-                return <JobCard key={`${job.id}-${index}`} job={job} />;
+                return <JobCard key={`${job.id}-${index}`} job={job} onStatusChange={handleStatusChange} />;
               })}
             </div>
             {loadingMore && (

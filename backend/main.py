@@ -58,12 +58,13 @@ class JobPosting(BaseModel):
     job_type: Optional[str] = None
     salary: Optional[str] = None
     tags: Optional[str] = None
+    status: Optional[str] = 'new'
 
 def init_db():
     conn = sqlite3.connect('jobs.db')
     c = conn.cursor()
-    # Drop old table and recreate with new schema
-    c.execute("DROP TABLE IF EXISTS jobs")
+    # We no longer drop the table to preserve user data (saved jobs)
+    # c.execute("DROP TABLE IF EXISTS jobs")
     c.execute('''
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,9 +77,15 @@ def init_db():
             description TEXT,
             job_type TEXT,
             salary TEXT,
-            tags TEXT
+            tags TEXT,
+            status TEXT DEFAULT 'new'
         )
     ''')
+    # Migrate existing database to add status column if it doesn't exist
+    try:
+        c.execute("ALTER TABLE jobs ADD COLUMN status TEXT DEFAULT 'new'")
+    except sqlite3.OperationalError:
+        pass # Column already exists
     conn.commit()
     conn.close()
 
@@ -189,8 +196,8 @@ def insert_jobs(jobs_list):
             continue
         try:
             c.execute('''
-                INSERT INTO jobs (title, company, location, link, date_posted, source, description, job_type, salary, tags)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO jobs (title, company, location, link, date_posted, source, description, job_type, salary, tags, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')
             ''', (
                 job["title"], job["company"], job["location"], job["link"],
                 job["date_posted"], job["source"], job.get("description", ""),
@@ -264,8 +271,24 @@ def get_jobs(
         "jobs": [dict(row) for row in rows],
         "total": total,
         "page": page,
-        "pages": (total + limit - 1) // limit
+        "pages": (total + limit - 1) // limit if limit > 0 else 1
     }
+
+class JobStatusUpdate(BaseModel):
+    status: str
+
+@app.patch("/api/jobs/{job_id}/status")
+def update_job_status(job_id: int, status_update: JobStatusUpdate):
+    valid_statuses = ["new", "saved", "applied", "rejected"]
+    if status_update.status not in valid_statuses:
+        return {"error": "Invalid status"}
+        
+    conn = sqlite3.connect('jobs.db')
+    c = conn.cursor()
+    c.execute("UPDATE jobs SET status = ? WHERE id = ?", (status_update.status, job_id))
+    conn.commit()
+    conn.close()
+    return {"message": f"Job {job_id} status updated to {status_update.status}"}
 
 @app.get("/api/stats")
 def get_stats():
@@ -306,3 +329,23 @@ def start_scraping_sync():
 def sync_jobs(background_tasks: BackgroundTasks):
     background_tasks.add_task(start_scraping_sync)
     return {"message": "Scraping started from Remotive, RemoteOK, Arbeitnow..."}
+
+# ──────────────────────────────────────────────────────
+# BACKGROUND SCHEDULER
+# ──────────────────────────────────────────────────────
+from apscheduler.schedulers.background import BackgroundScheduler
+
+scheduler = BackgroundScheduler()
+
+@scheduler.scheduled_job('interval', hours=1)
+def scheduled_scrape():
+    logger.info("Running scheduled hourly scrape...")
+    start_scraping_sync()
+
+@app.on_event("startup")
+def startup_event():
+    scheduler.start()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.shutdown()

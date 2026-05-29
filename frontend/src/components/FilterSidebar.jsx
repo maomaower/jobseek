@@ -19,6 +19,17 @@ const FilterSidebar = ({ filters, setFilters, onSync, isSyncing }) => {
           <option value="Arbeitnow">Arbeitnow</option>
         </select>
       </div>
+
+      <div className="filter-group">
+        <label htmlFor="status">Status</label>
+        <select name="status" id="status" value={filters.status || 'All'} onChange={handleChange}>
+          <option value="All">All Jobs</option>
+          <option value="new">New Jobs</option>
+          <option value="saved">Saved Jobs</option>
+          <option value="applied">Applied</option>
+          <option value="rejected">Hidden/Rejected</option>
+        </select>
+      </div>
       
       <div className="filter-group">
         <label htmlFor="search">Search Keywords</label>

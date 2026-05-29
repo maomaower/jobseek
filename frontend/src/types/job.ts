@@ -8,4 +8,5 @@ export interface Job {
   tags?: string;
   date_posted: string;
   source: string;
+  status: 'new' | 'saved' | 'applied' | 'rejected';
 }

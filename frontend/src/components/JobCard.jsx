@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
 
-const JobCard = forwardRef(({ job }, ref) => {
+const JobCard = forwardRef(({ job, onStatusChange }, ref) => {
   const formatDate = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -45,8 +45,26 @@ const JobCard = forwardRef(({ job }, ref) => {
       </div>
       
       <div className="footer">
-        <span>{formatDate(job.date_posted)}</span>
-        <span className="source-badge">{job.source}</span>
+        <div>
+          <span>{formatDate(job.date_posted)}</span>
+          <span className="source-badge" style={{ marginLeft: '0.5rem' }}>{job.source}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <select 
+            value={job.status || 'new'} 
+            onChange={(e) => {
+              e.preventDefault();
+              onStatusChange(job.id, e.target.value);
+            }}
+            onClick={(e) => e.preventDefault()}
+            style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--surface-color)', color: 'var(--text-primary)' }}
+          >
+            <option value="new">New</option>
+            <option value="saved">Saved</option>
+            <option value="applied">Applied</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
       </div>
     </a>
   );
