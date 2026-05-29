@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+sqlalchemy
+apscheduler
+beautifulsoup4
+playwright
+pydantic
+requests
